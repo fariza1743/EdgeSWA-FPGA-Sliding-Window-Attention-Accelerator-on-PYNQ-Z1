@@ -222,7 +222,6 @@ Normalize the attention weights.
 Accumulate the weighted value vectors.
 Apply saturation and store the resulting INT8 output.
 
-<p align="center"> <img src="figures/kernel_dataflow.png" width="850" alt="Input-stationary sliding-window attention dataflow"> </p>
 
 ## Approximate SoftMax
 
