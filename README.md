@@ -83,7 +83,7 @@ This prototype investigates four questions:
 
 3. **Performance:** How does FPGA execution latency compare with an ARM CPU software implementation?
 
-4. **Scalability:** How do latency, throughput, and output error change as the sequence length increases from $$ \(N=16\) $$ to $$ \(N=128\) $$?
+4. **Scalability:** How do latency, throughput, and output error change as the sequence length increases from N=16 to N=128 ?
 
 ---
 
