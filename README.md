@@ -16,26 +16,26 @@ $$
 
 where:
 
-- \(N\) is the sequence length,
-- \(D\) is the feature dimension.
+- N is the sequence length,
+- D is the feature dimension.
 
 This quadratic complexity makes conventional full attention difficult to deploy on small embedded FPGA platforms with limited DSPs, BRAM, and memory bandwidth.
 
 This project implements **causal sliding-window attention**, where each token attends only to a fixed number of nearby tokens. Its computational complexity becomes:
 
-\[
-O(NWD)
-\]
+$$
+\mathcal{O}{(NWD)}
+$$
 
-where \(W\) is the sliding-window size.
+where W is the sliding-window size.
 
 The proposed accelerator combines:
 
-- fixed-point sliding-window attention,
-- input-stationary query reuse,
-- piecewise approximate SoftMax,
+- Fixed-point sliding-window attention,
+- Input-stationary query reuse,
+- Piecewise approximate SoftMax,
 - AXI-based PS–PL communication,
-- physical deployment on a PYNQ-Z1 board.
+- Physical deployment on a PYNQ-Z1 board.
 
 > **Main contribution:** A working fixed-point sliding-window attention accelerator with approximate SoftMax was deployed and evaluated on physical FPGA hardware.
 
@@ -45,32 +45,31 @@ The proposed accelerator combines:
 
 Full self-attention compares every query token with every key token:
 
-\[
-S = QK^T
-\]
+$$
+\mathcal{S} = {QK^T}
+$$
 
-This produces an \(N \times N\) attention matrix and requires approximately:
+This produces an $$ (N \times N\) $$ attention matrix and requires approximately:
 
-\[
-O(N^2D)
-\]
-
+$$
+\mathcal{O}(N^2D)
+$$
 operations.
 
 This becomes challenging on an embedded FPGA because:
 
-- the attention matrix grows quadratically,
+- The attention matrix grows quadratically,
 - Q, K, and V transfers create substantial memory traffic,
-- exact exponential and division operations in SoftMax are expensive,
-- the available LUT, DSP, BRAM, and DDR bandwidth are limited.
+- Exact exponential and division operations in SoftMax are expensive,
+- The available LUT, DSP, BRAM, and DDR bandwidth are limited.
 
 Sliding-window attention reduces the number of comparisons by restricting each query token to a local window.
 
-For token \(i\), the implemented causal window is:
+For token $$\(i\)$$, the implemented causal window is:
 
-\[
+$$
 j \in [\max(0,i-W+1),i]
-\]
+$$
 
 Therefore, each token attends only to itself and its preceding nearby tokens.
 
@@ -86,7 +85,7 @@ This prototype investigates four questions:
 
 3. **Performance:** How does FPGA execution latency compare with an ARM CPU software implementation?
 
-4. **Scalability:** How do latency, throughput, and output error change as the sequence length increases from \(N=16\) to \(N=128\)?
+4. **Scalability:** How do latency, throughput, and output error change as the sequence length increases from $$ \(N=16\) $$ to $$ \(N=128\) $$?
 
 ---
 
@@ -136,10 +135,10 @@ The programmable logic contains the HLS attention accelerator and performs:
 
 The DDR memory stores:
 
-- query matrix \(Q\),
-- key matrix \(K\),
-- value matrix \(V\),
-- output matrix \(O\).
+- query matrix Q,
+- key matrix K,
+- value matrix V,
+- output matrix O.
 
 The processing system controls the accelerator through **AXI-Lite**, while the programmable logic accesses tensors through the **AXI HP DDR interface**.
 
@@ -151,102 +150,106 @@ The processing system controls the accelerator through **AXI-Lite**, while the p
 
 ## Sliding-Window Attention Algorithm
 
-For every query token \(Q_i\), the accelerator processes only the keys and values inside its causal window.
+For each query token $Q_i$, the accelerator processes only the keys and values within its causal attention window.
 
-The first valid key index is:
+The first valid key index is
 
-\[
-j_{\min}=\max(0,i-W+1)
-\]
+$$
+j_{\min} = \max(0, i - W + 1),
+$$
 
-The attention scores are calculated as:
+where $W$ is the sliding-window size.
 
-\[
-s_{ij}
-=
-\frac{Q_iK_j^T}{\sqrt{D}},
+The attention score between query $Q_i$ and key $K_j$ is computed as
+
+$$
+s_{ij} = \frac{Q_i K_j^{T}}{\sqrt{D}},
 \qquad
-j_{\min}\leq j\leq i
-\]
+j_{\min} \leq j \leq i,
+$$
 
-The normalized attention output is:
+where $D$ is the query and key dimension.
 
-\[
-O_i
-=
+For numerical stability, the maximum score within the current window is
+
+\max_{j_{\min} \leq k \leq i} s_{ik}.
+$$
+
+The normalized attention weights are then calculated as
+
+\frac{\exp\left(s_{ij} - s_{\max}^{(i)}\right)}
+{\displaystyle\sum_{k=j_{\min}}^{i}
+\exp\left(s_{ik} - s_{\max}^{(i)}\right)}.
+$$
+
+Finally, the attention output for query token $Q_i$ is
+
 \sum_{j=j_{\min}}^{i}
-\alpha_{ij}V_j
-\]
+\alpha_{ij} V_j.
+$$
 
-where:
+Unlike full self-attention, attention scores for tokens outside the local causal window are never computed. This reduces the computational complexity from
 
-\[
-\alpha_{ij}
-=
-\frac{\exp(s_{ij}-s_{\max})}
-{\sum_k \exp(s_{ik}-s_{\max})}
-\]
+$$
+\mathcal{O}(N^2D)
+$$
 
-and:
+to approximately
 
-\[
-s_{\max}=\max_j s_{ij}
-\]
+$$
+\mathcal{O}(NWD),
+$$
 
-Unlike full attention, scores outside the local window are never computed.
+where $N$ is the sequence length.
 
----
+
 
 ## Hardware Dataflow
 
-The accelerator follows an input-stationary query dataflow.
+The accelerator follows an input-stationary query dataflow, in which each query vector remains in an on-chip buffer while the corresponding key and value vectors are streamed through the processing units.
 
-For each token \(i\):
+For each query token $i$, the accelerator performs the following steps:
 
-1. Load query vector \(Q_i\) into an on-chip buffer.
-2. Determine the causal sliding-window boundaries.
-3. Stream the corresponding \(K_j\) and \(V_j\) vectors.
-4. Compute query-key dot products.
-5. identify the maximum attention score.
-6. Apply score shifting and clipping.
-7. Approximate the exponential values.
-8. Approximate the reciprocal of the SoftMax denominator.
-9. Normalize the attention weights.
-10. Accumulate the weighted value vectors.
-11. Saturate and store the INT8 output.
+Load the query vector $Q_i$ into an on-chip buffer.
+Determine the boundaries of the causal sliding window.
+Stream the corresponding key vectors $K_j$ and value vectors $V_j$.
+Compute the query-key dot products.
+Identify the maximum attention score within the window.
+Apply score shifting and clipping for numerical stability.
+Approximate the exponential values.
+Approximate the reciprocal of the SoftMax denominator.
+Normalize the attention weights.
+Accumulate the weighted value vectors.
+Apply saturation and store the resulting INT8 output.
 
-<p align="center">
-  <img src="figures/kernel_dataflow.png" width="850">
-</p>
-
----
+<p align="center"> <img src="figures/kernel_dataflow.png" width="850" alt="Input-stationary sliding-window attention dataflow"> </p>
 
 ## Approximate SoftMax
 
 Exact SoftMax requires exponential and division operations:
 
-\[
-\alpha_j
-=
-\frac{\exp(s_j-s_{\max})}
-{\sum_k \exp(s_k-s_{\max})}
-\]
+\frac{\exp\left(s_j-s_{\max}\right)}
+{\displaystyle\sum_k \exp\left(s_k-s_{\max}\right)}.
+$$
 
-These operations are expensive on a small FPGA.
+These operations are computationally expensive and resource-intensive on a small FPGA.
 
-The accelerator therefore uses the following approximation procedure:
+To reduce hardware complexity, the accelerator applies the following approximation procedure:
 
-1. Subtract the maximum score for numerical stability.
-2. Clip the shifted score to the range \([-8,0]\).
-3. Replace the exact exponential with piecewise constant approximations.
-4. Accumulate the approximate exponential values.
-5. Replace exact division with reciprocal approximation buckets.
-6. Normalize the attention weights using the approximate reciprocal.
-7. Saturate the final output to the INT8 range.
+Subtract the maximum attention score for numerical stability.
+Clip the shifted score to the range $[-8, 0]$.
+Replace the exact exponential function with a piecewise-constant approximation.
+Accumulate the approximate exponential values to form the SoftMax denominator.
+Replace exact division with a bucket-based reciprocal approximation.
+Normalize the attention weights using the approximate reciprocal.
+Accumulate the weighted value vectors and saturate the final output to the INT8 range.
 
-The approximate Python reference reproduces this behavior and is used to distinguish hardware implementation error from approximation error.
+A Python reference implementation reproduces the same approximate SoftMax behavior. It is used to separate two sources of error:
 
----
+Approximation error: the difference between exact SoftMax and the approximate Python implementation.
+Hardware implementation error: the difference between the approximate Python implementation and the RTL accelerator output.
+
+This comparison helps verify whether observed numerical differences are caused by the approximation method itself or by an error in the hardware implementation.
 
 ## Implementation Configuration
 
