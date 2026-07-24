@@ -140,11 +140,7 @@ The DDR memory stores:
 
 The processing system controls the accelerator through **AXI-Lite**, while the programmable logic accesses tensors through the **AXI HP DDR interface**.
 
-<p align="center">
-  <img src="figures/ps_pl_architecture.png" width="850">
-</p>
 
----
 
 ## Sliding-Window Attention Algorithm
 
