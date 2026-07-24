@@ -2,9 +2,7 @@
 
 A prototype HLS implementation of fixed-point sliding-window attention with approximate SoftMax for FPGA-based edge inference on the PYNQ-Z1/Zynq-7020 platform.
 
-<p align="center">
-  <img src="figures/system_architecture.png" width="850">
-</p>
+This work was done as a project in "Hardware for Neural Network" course (PhD).
 
 ## Overview
 
