@@ -10,9 +10,9 @@ A prototype HLS implementation of fixed-point sliding-window attention with appr
 
 Transformer self-attention provides strong modeling capability, but its computational cost grows quadratically with sequence length:
 
-\[
+$$
 \mathcal{O}(N^2D)
-\]
+$$
 
 where:
 
