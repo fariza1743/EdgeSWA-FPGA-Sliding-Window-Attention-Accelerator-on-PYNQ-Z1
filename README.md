@@ -164,25 +164,31 @@ $$
 
 where $D$ is the query and key dimension.
 
-For numerical stability, the maximum score within the current window is
+For numerical stability, the maximum attention score within the current window is
 
 \max_{j_{\min} \leq k \leq i} s_{ik}.
 $$
 
-The normalized attention weights are then calculated as
+The normalized attention weights are then computed as
 
-\frac{\exp\left(s_{ij} - s_{\max}^{(i)}\right)}
-{\displaystyle\sum_{k=j_{\min}}^{i}
-\exp\left(s_{ik} - s_{\max}^{(i)}\right)}.
+\frac{
+\exp\left(s_{ij}-s_{\max}^{(i)}\right)
+}{
+\displaystyle
+\sum_{k=j_{\min}}^{i}
+\exp\left(s_{ik}-s_{\max}^{(i)}\right)
+},
+\qquad
+j_{\min} \leq j \leq i.
 $$
 
 Finally, the attention output for query token $Q_i$ is
 
 \sum_{j=j_{\min}}^{i}
-\alpha_{ij} V_j.
+\alpha_{ij}V_j.
 $$
 
-Unlike full self-attention, attention scores for tokens outside the local causal window are never computed. This reduces the computational complexity from
+Unlike full self-attention, attention scores for tokens outside the local causal window are never computed. Therefore, the computational complexity is reduced from
 
 $$
 \mathcal{O}(N^2D)
@@ -194,7 +200,7 @@ $$
 \mathcal{O}(NWD),
 $$
 
-where $N$ is the sequence length.
+where $N$ is the sequence length, $W$ is the sliding-window size, and $D$ is the feature dimension.
 
 
 
